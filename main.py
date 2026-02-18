@@ -16,7 +16,7 @@ def main():
     
     exercises = [
         "squat", "lunge", "jumping_jacks", "high_knees", 
-        "arm_circles", "side_leg_raise", "calf_raises", "torso_twist"
+        "bicep_curl", "shoulder_press", "calf_raises", "torso_twist"
     ]
     current_idx = 0
     
@@ -29,11 +29,9 @@ def main():
 
     template = load_template(current_idx)
     
-    # State Machine V2 (STRICT)
-    counter = 0
-    state = "NEUTRAL" 
-    rep_has_bottomed = False
-    rep_start_time = 0
+    # State Machine V3 (STRICT ISOLATION)
+    # Using a state dict to prevent leakage between exercises
+    state_tracker = {ex: {"counter": 0, "bottomed": False, "last_rep_time": 0} for ex in exercises}
     
     cap = cv2.VideoCapture(0, cv2.CAP_DSHOW)
     if not cap.isOpened():
@@ -61,6 +59,13 @@ def main():
         if landmarks is not None:
             angles = get_joint_angles(landmarks)
             ex = exercises[current_idx]
+            st = state_tracker[ex]
+            
+            # --- ULTIMATE ISOLATION: Wipe background states ---
+            # This prevents any movement while in one "tab" from ever being remembered by another
+            for other_ex in exercises:
+                if other_ex != ex:
+                    state_tracker[other_ex]["bottomed"] = False
             
             # --- 1. INITIALIZE & CALCULATE METRICS ---
             knee_val = (angles.get('left_knee', 180) + angles.get('right_knee', 180)) / 2
@@ -74,14 +79,18 @@ def main():
             is_form_correct = True
             
             # --- 2. VISIBILITY & FORM CHECK ---
-            vis_points = [23, 24, 25, 26, 27, 28] 
-            full_body_vis = all(landmarks[i][3] > 0.7 for i in vis_points)
+            seated_exercises = ["bicep_curl", "shoulder_press", "torso_twist"]
+            if ex in seated_exercises:
+                vis_points = [11, 12, 13, 14, 15, 16] # Just upper body
+            else:
+                vis_points = [23, 24, 25, 26, 27, 28] # Critical lower body
+                
+            full_body_vis = all(landmarks[i][3] > 0.6 for i in vis_points)
             
             if not full_body_vis:
                 is_form_correct = False
-                feedback_msg = "STEP BACK ->"
-                # Emergency Reset: If we lose the body, reset the current rep
-                rep_has_bottomed = False
+                feedback_msg = "ADJUST VIEW ->" if ex in seated_exercises else "STEP BACK ->"
+                st["bottomed"] = False
             else:
                 # Exercise Specific Corrections
                 if ex == "squat":
@@ -103,65 +112,144 @@ def main():
                     if torso_lean > 0.15:
                         feedback_msg = "STAND TALL!"; is_form_correct = False
 
-            # --- 3. REP COUNTING (DYNAMIC TRIGGER) ---
-            if ex == "squat":
-                if knee_val < 135: rep_has_bottomed = True
-                elif knee_val > 160 and rep_has_bottomed:
-                    counter += 1; rep_has_bottomed = False
-                depth_percent = np.clip((170 - knee_val) / 60, 0, 1)
+                elif ex == "bicep_curl":
+                    l_el = calculate_angle(landmarks[11][:2], landmarks[13][:2], landmarks[15][:2])
+                    r_el = calculate_angle(landmarks[12][:2], landmarks[14][:2], landmarks[16][:2])
+                    
+                    # Movement Authentication: Wrists MUST stay below shoulders for a curl
+                    wrist_below = landmarks[15][1] > landmarks[11][1] and landmarks[16][1] > landmarks[12][1]
+                    if not wrist_below:
+                        feedback_msg = "KEEP HANDS BELOW SHOULDERS"; is_form_correct = False
+                    elif abs(l_el - r_el) > 40:
+                        feedback_msg = "SYNC BOTH ARMS!"; is_form_correct = False
+                        
+                elif ex == "shoulder_press":
+                    l_el_ang = calculate_angle(landmarks[11][:2], landmarks[13][:2], landmarks[15][:2])
+                    r_el_ang = calculate_angle(landmarks[12][:2], landmarks[14][:2], landmarks[16][:2])
+                    elbow_avg = (l_el_ang + r_el_ang) / 2
+                    
+                    # BIOMETRIC ZONE: In a press, ELBOWS must be at or above shoulder level
+                    # This prevents Bicep Curls (elbows at ribs) from being detected here
+                    l_elbow_y, r_elbow_y = landmarks[13][1], landmarks[14][1]
+                    sh_y = (landmarks[11][1] + landmarks[12][1]) / 2
+                    
+                    if l_elbow_y > sh_y + 0.05 or r_elbow_y > sh_y + 0.05:
+                        feedback_msg = "RAISE ELBOWS TO SHOULDER LEVEL"; is_form_correct = False
+                    elif abs(l_el_ang - r_el_ang) > 45:
+                        feedback_msg = "SYNC BOTH ARMS!"; is_form_correct = False
+                
+                elif ex == "lunge":
+                    active_knee = min(angles.get('left_knee', 180), angles.get('right_knee', 180))
+                    # Lunge should have a significant knee bend
+                    if active_knee > 160 and depth_percent > 0.1:
+                        feedback_msg = "GO DEEPER!"; is_form_correct = False
+                    # Check for chest leaning forward too much
+                    torso_tilt = abs(landmarks[11][0] - landmarks[23][0])
+                    if torso_tilt > 0.12:
+                        feedback_msg = "KEEP CHEST UP"; is_form_correct = False
+
             
+            # --- 3. REP COUNTING (STRICT ISOLATION) ---
+            if ex == "squat":
+                if knee_val < 135 and is_form_correct: st["bottomed"] = True
+                elif knee_val > 165 and st["bottomed"]:
+                    if is_form_correct and (time.time() - st["last_rep_time"] > 1.5):
+                        st["counter"] += 1
+                        st["last_rep_time"] = time.time()
+                    st["bottomed"] = False
+                depth_percent = np.clip((170 - knee_val) / 60, 0, 1)
+
             elif ex == "jumping_jacks":
-                if arm_val > 130: rep_has_bottomed = True
-                elif arm_val < 50 and rep_has_bottomed:
-                    counter += 1; rep_has_bottomed = False
+                if arm_val > 140 and is_form_correct: st["bottomed"] = True
+                elif arm_val < 60 and st["bottomed"]:
+                    if is_form_correct and (time.time() - st["last_rep_time"] > 1.0):
+                        st["counter"] += 1
+                        st["last_rep_time"] = time.time()
+                    st["bottomed"] = False
                 depth_percent = np.clip((arm_val - 40) / 110, 0, 1)
 
             elif ex == "high_knees":
                 active_hip = max(180 - angles.get('left_hip', 180), 180 - angles.get('right_hip', 180))
-                if active_hip > 65: rep_has_bottomed = True
-                elif active_hip < 30 and rep_has_bottomed:
-                    counter += 1; rep_has_bottomed = False
+                if active_hip > 70 and is_form_correct: st["bottomed"] = True
+                elif active_hip < 30 and st["bottomed"]:
+                    if is_form_correct and (time.time() - st["last_rep_time"] > 1.0):
+                        st["counter"] += 1
+                        st["last_rep_time"] = time.time()
+                    st["bottomed"] = False
                 depth_percent = np.clip(active_hip / 70, 0, 1)
+
+            elif ex == "bicep_curl":
+                l_el = calculate_angle(landmarks[11][:2], landmarks[13][:2], landmarks[15][:2])
+                r_el = calculate_angle(landmarks[12][:2], landmarks[14][:2], landmarks[16][:2])
+                elbow_avg = (l_el + r_el) / 2
+                depth_percent = np.clip((155 - elbow_avg) / 80, 0, 1)
+                
+                # Double check hands are below shoulders (to block Press leakage)
+                wrist_below = landmarks[15][1] > landmarks[11][1] and landmarks[16][1] > landmarks[12][1]
+                
+                if elbow_avg < 95 and is_form_correct and wrist_below: 
+                    st["bottomed"] = True
+                elif elbow_avg > 145 and st["bottomed"]:
+                    if is_form_correct and (time.time() - st["last_rep_time"] > 1.2):
+                        st["counter"] += 1
+                        st["last_rep_time"] = time.time()
+                    st["bottomed"] = False
+
+            elif ex == "shoulder_press":
+                l_el_ang = calculate_angle(landmarks[11][:2], landmarks[13][:2], landmarks[15][:2])
+                r_el_ang = calculate_angle(landmarks[12][:2], landmarks[14][:2], landmarks[16][:2])
+                elbow_avg = (l_el_ang + r_el_ang) / 2
+                
+                # Height Authentication: Highest point (wrist) must definitely be above shoulder
+                sh_y = (landmarks[11][1] + landmarks[12][1]) / 2
+                highest_wrist_y = min(landmarks[15][1], landmarks[16][1])
+                overhead_clearance = sh_y - highest_wrist_y
+                
+                # Depth gauge based on how close elbows are to full extension (100 to 160)
+                depth_percent = np.clip((elbow_avg - 100) / 60, 0, 1)
+                
+                # TRIGGER TOP: Arms straightening + Hands Overhead
+                if elbow_avg > 145 and overhead_clearance > 0.1 and is_form_correct:
+                    st["bottomed"] = True
+                
+                # TRIGGER COMPLETION: Arms return to 'bent' state near ears
+                elif elbow_avg < 115 and st["bottomed"]:
+                    if time.time() - st["last_rep_time"] > 1.2:
+                        st["counter"] += 1
+                        st["last_rep_time"] = time.time()
+                    st["bottomed"] = False
 
             elif ex == "lunge":
                 active_knee = min(angles.get('left_knee', 180), angles.get('right_knee', 180))
-                if active_knee < 130: rep_has_bottomed = True
-                elif active_knee > 165 and rep_has_bottomed:
-                    counter += 1; rep_has_bottomed = False
-                depth_percent = np.clip((170 - active_knee) / 60, 0, 1)
+                if active_knee < 120 and is_form_correct: st["bottomed"] = True
+                elif active_knee > 165 and st["bottomed"]:
+                    if is_form_correct and (time.time() - st["last_rep_time"] > 1.8):
+                        st["counter"] += 1
+                        st["last_rep_time"] = time.time()
+                    st["bottomed"] = False
+                depth_percent = np.clip((175 - active_knee) / 60, 0, 1)
 
-            elif ex == "side_leg_raise":
-                val = angles.get('right_hip', 180)
-                if val < 155: rep_has_bottomed = True
-                elif val > 170 and rep_has_bottomed:
-                    counter += 1; rep_has_bottomed = False
-                depth_percent = np.clip((180 - val) / 40, 0, 1)
-            
             elif ex == "calf_raises":
                 curr_y = landmarks[11][1]
                 if not hasattr(main, "base_y") or main.base_y == 0: main.base_y = curr_y
-                
-                if curr_y < main.base_y - 0.03: rep_has_bottomed = True
-                elif curr_y > main.base_y - 0.005 and rep_has_bottomed:
-                    counter += 1; rep_has_bottomed = False
-                
                 diff = main.base_y - curr_y
+                if diff > 0.04 and is_form_correct: st["bottomed"] = True
+                elif diff < 0.01 and st["bottomed"]:
+                    if is_form_correct and (time.time() - st["last_rep_time"] > 1.2):
+                        st["counter"] += 1
+                        st["last_rep_time"] = time.time()
+                    st["bottomed"] = False
                 depth_percent = np.clip(diff / 0.08, 0, 1)
 
-            elif ex == "arm_circles":
-                # Simple accumulate
-                if not hasattr(main, "circ_accum"): main.circ_accum = 0
-                main.circ_accum += np.linalg.norm(landmarks[15][:2] - landmarks[11][:2])
-                if main.circ_accum > 15: # Arbitrary accumulation
-                    counter += 1; main.circ_accum = 0
-                depth_percent = 0.5 # No specific depth for circles, just rhythmic
-
             elif ex == "torso_twist":
-                w = abs(landmarks[11][0] - landmarks[12][0])
-                if w < 0.10: rep_has_bottomed = True
-                elif w > 0.15 and rep_has_bottomed:
-                    counter += 1; rep_has_bottomed = False
-                depth_percent = 0.5 # No specific depth for twist, just rhythmic
+                w_val = abs(landmarks[11][0] - landmarks[12][0])
+                if w_val < 0.10 and is_form_correct: st["bottomed"] = True
+                elif w_val > 0.15 and st["bottomed"]:
+                    if is_form_correct and (time.time() - st["last_rep_time"] > 1.2):
+                        st["counter"] += 1
+                        st["last_rep_time"] = time.time()
+                    st["bottomed"] = False
+                depth_percent = 0.5
 
             # --- 4. DYNAMIC COACH SYNC (Demo vs. Sync) ---
             # If user is idle, show a demo. If user moves, sync to them.
@@ -207,7 +295,7 @@ def main():
             # Stack 
             canvas[:, :w] = frame
             canvas[:, w:] = coach_canvas
-            canvas = ui.render_hud(canvas, ex, counter, is_form_correct, depth_percent)
+            canvas = ui.render_hud(canvas, ex, st["counter"], is_form_correct, depth_percent)
 
         else:
             # No body detected
@@ -220,10 +308,14 @@ def main():
         
         key = cv2.waitKey(1) & 0xFF
         if key == ord('q'): break
-        elif ord('1') <= key <= ord('8'):
-            current_idx = key - ord('1')
-            template = load_template(current_idx)
-            counter = 0; rep_has_bottomed = False
+        elif ord('1') <= key <= ord('9') or key == ord('0'):
+            idx = 9 if key == ord('0') else (key - ord('1'))
+            if idx < len(exercises):
+                current_idx = idx
+                template = load_template(current_idx)
+                # RESET current rep state when switching to prevent leakage
+                state_tracker[exercises[current_idx]]["bottomed"] = False
+                if hasattr(main, "base_y"): del main.base_y
 
 
     cap.release(); cv2.destroyAllWindows()

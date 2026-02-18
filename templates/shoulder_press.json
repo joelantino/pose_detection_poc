@@ -1,0 +1,8 @@
+{
+    "exercise_name": "Shoulder Press",
+    "target_angles": {
+        "left_elbow": 160,
+        "right_elbow": 160
+    },
+    "tolerance": 20
+}

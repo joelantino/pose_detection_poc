@@ -1,0 +1,8 @@
+{
+    "exercise_name": "Bicep Curl",
+    "target_angles": {
+        "left_elbow": 45,
+        "right_elbow": 45
+    },
+    "tolerance": 30
+}

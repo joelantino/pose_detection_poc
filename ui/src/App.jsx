@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 
 const exercises = [
     "Squat", "Lunge", "Jumping Jacks", "High Knees",
-    "Arm Circles", "Side Leg Raise", "Calf Raises", "Torso Twist"
+    "Bicep Curl", "Shoulder Press", "Calf Raises", "Torso Twist"
 ];
 
 function App() {

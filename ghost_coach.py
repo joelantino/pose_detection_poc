@@ -83,6 +83,31 @@ class GhostCoach:
             pose[0:23, 1] += (depth * 0.8) * phase       # Upper body follows
             # ARMS: Stationary on hips (move with torso)
 
+        elif exercise_type == "bicep_curl":
+            # Tuck elbows to sides
+            pose[13] = [0.42, 0.42, 0, 1]
+            pose[14] = [0.58, 0.42, 0, 1]
+            # Curl arc for wrists
+            # Phase 0: Down (150 deg), Phase 1: Up (30 deg)
+            radius = 0.18
+            # Angle 0 = Straight down (+PI/2), Angle PI = Straight up (-PI/2)
+            angle = (np.pi/2) - (phase * 1.2 * np.pi) 
+            angle = np.clip(angle, -np.pi/3, np.pi/2) # Limit ROM
+            
+            pose[15, 0] = pose[13, 0] - radius * np.cos(angle)
+            pose[15, 1] = pose[13, 1] + radius * np.sin(angle)
+            pose[16, 0] = pose[14, 0] + radius * np.cos(angle)
+            pose[16, 1] = pose[14, 1] + radius * np.sin(angle)
+
+        elif exercise_type == "shoulder_press":
+            # Start: Elbows at 90 deg, shoulder height
+            # End: Arms full extension overhead
+            pose[13] = [0.35, 0.25 - (0.2 * phase), 0, 1] # Elbows
+            pose[14] = [0.65, 0.25 - (0.2 * phase), 0, 1]
+            
+            pose[15] = [0.35, 0.25 - (0.35 * phase), 0, 1] # Wrists
+            pose[16] = [0.65, 0.25 - (0.35 * phase), 0, 1]
+
         elif exercise_type == "lunge":
             # Right leg forward lunge
             lunge_depth = 0.22
