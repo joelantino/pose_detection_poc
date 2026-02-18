@@ -60,4 +60,3 @@ physio_ai_poc/
 6. **Telemetry**: Syncs rep counts and form accuracy to the local state tracker.
 
 ---
-*Built with ❤️ for Advanced Physiotherapy AI.*
