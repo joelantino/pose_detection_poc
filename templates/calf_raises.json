@@ -1,0 +1,7 @@
+{
+    "exercise": "calf_raises",
+    "target_angles": {
+        "ankle_extension": 20.0
+    },
+    "tolerance": 10.0
+}

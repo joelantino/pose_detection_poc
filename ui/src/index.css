@@ -1,0 +1,171 @@
+:root {
+  --bg-color: #0d0f14;
+  --panel-bg: rgba(255, 255, 255, 0.05);
+  --accent-cyan: #00e5ff;
+  --accent-emerald: #00ffa3;
+  --accent-orange: #ff3d00;
+  --text-primary: #ffffff;
+  --text-secondary: #a0a0a0;
+  --glass-border: rgba(255, 255, 255, 0.1);
+}
+
+body {
+  margin: 0;
+  font-family: 'Outfit', sans-serif;
+  background-color: var(--bg-color);
+  color: var(--text-primary);
+  overflow: hidden;
+}
+
+.dashboard-container {
+  display: grid;
+  grid-template-columns: 280px 1fr;
+  height: 100vh;
+}
+
+/* Sidebar Styling */
+.sidebar {
+  background: rgba(13, 15, 20, 0.8);
+  border-right: 1px solid var(--glass-border);
+  padding: 30px 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 15px;
+}
+
+.brand {
+  font-size: 1.5rem;
+  font-weight: 700;
+  color: var(--accent-cyan);
+  margin-bottom: 30px;
+  letter-spacing: -0.5px;
+}
+
+.exercise-btn {
+  padding: 14px 18px;
+  border-radius: 12px;
+  background: transparent;
+  border: 1px solid transparent;
+  color: var(--text-secondary);
+  text-align: left;
+  cursor: pointer;
+  font-family: inherit;
+  font-size: 1rem;
+  transition: all 0.3s ease;
+}
+
+.exercise-btn:hover {
+  background: var(--panel-bg);
+  color: var(--text-primary);
+}
+
+.exercise-btn.active {
+  background: var(--panel-bg);
+  border-color: var(--accent-cyan);
+  color: var(--accent-cyan);
+  box-shadow: 0 0 15px rgba(0, 229, 255, 0.2);
+}
+
+/* Main Console */
+.main-console {
+  display: flex;
+  flex-direction: column;
+  padding: 20px;
+  gap: 20px;
+}
+
+.header-hud {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 20px 30px;
+  background: var(--panel-bg);
+  backdrop-filter: blur(10px);
+  border-radius: 20px;
+  border: 1px solid var(--glass-border);
+}
+
+.rep-counter {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+}
+
+.rep-count {
+  font-size: 2.5rem;
+  font-weight: 700;
+  color: var(--accent-emerald);
+}
+
+.split-view {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 20px;
+  flex-grow: 1;
+}
+
+.camera-feed, .coach-view {
+  position: relative;
+  background: #000;
+  border-radius: 24px;
+  overflow: hidden;
+  border: 1px solid var(--glass-border);
+  box-shadow: 0 20px 40px rgba(0,0,0,0.5);
+}
+
+video, canvas {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.view-label {
+  position: absolute;
+  bottom: 20px;
+  left: 20px;
+  background: rgba(0,0,0,0.5);
+  padding: 6px 14px;
+  border-radius: 8px;
+  font-size: 0.8rem;
+  letter-spacing: 1px;
+}
+
+.depth-gauge-container {
+  position: absolute;
+  right: 20px;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 12px;
+  height: 200px;
+  background: rgba(255,255,255,0.1);
+  border-radius: 10px;
+  overflow: hidden;
+}
+
+.depth-fill {
+  position: absolute;
+  bottom: 0;
+  width: 100%;
+  background: var(--accent-cyan);
+  transition: height 0.1s linear;
+}
+
+.status-toast {
+  position: absolute;
+  bottom: 20px;
+  left: 50%;
+  transform: translateX(-50%);
+  padding: 10px 20px;
+  border-radius: 30px;
+  background: rgba(0, 255, 163, 0.2);
+  color: var(--accent-emerald);
+  border: 1px solid var(--accent-emerald);
+  font-weight: 600;
+  backdrop-filter: blur(5px);
+}
+
+.status-toast.error {
+  background: rgba(255, 61, 0, 0.2);
+  color: var(--accent-orange);
+  border-color: var(--accent-orange);
+}

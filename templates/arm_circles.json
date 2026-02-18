@@ -1,0 +1,7 @@
+{
+    "exercise": "arm_circles",
+    "target_angles": {
+        "shoulder_angle": 90.0
+    },
+    "tolerance": 25.0
+}

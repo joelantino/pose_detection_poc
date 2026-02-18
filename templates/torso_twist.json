@@ -1,0 +1,7 @@
+{
+    "exercise": "torso_twist",
+    "target_angles": {
+        "rotation": 45.0
+    },
+    "tolerance": 20.0
+}

@@ -1,0 +1,19 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+venv/
+.env
+
+# MediaPipe
+*.task
+
+# UI Dependencies
+ui/node_modules/
+ui/dist/
+.vscode/
+
+# Project Specific
+*.mp4
+*.avi
+*.log

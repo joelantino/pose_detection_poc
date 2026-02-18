@@ -1,0 +1,7 @@
+{
+    "exercise": "jumping_jacks",
+    "target_angles": {
+        "shoulder_angle": 160.0
+    },
+    "tolerance": 30.0
+}

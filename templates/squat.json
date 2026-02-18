@@ -1,0 +1,9 @@
+{
+    "exercise": "squat",
+    "target_angles": {
+        "knee_angle": 90.0,
+        "hip_angle": 95.0
+    },
+    "tolerance": 15.0,
+    "ideal_pose_path": "templates/squat_ideal.npy"
+}

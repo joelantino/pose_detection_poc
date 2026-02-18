@@ -1,0 +1,7 @@
+{
+    "exercise": "side_leg_raise",
+    "target_angles": {
+        "hip_abduction": 45.0
+    },
+    "tolerance": 15.0
+}
